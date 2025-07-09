@@ -124,6 +124,7 @@ def download(
     format=None,
     user_agent=None,
     log_messages=None,
+    progress_callback=None,
 ):
     """Download file from URL.
 
@@ -369,6 +370,16 @@ def download(
             f.write(chunk)
             if not quiet:
                 pbar.update(len(chunk))
+            if progress_callback:
+                progress_callback(
+                    {
+                        "chunk_size": len(chunk),
+                        "bytes_downloaded": pbar.n,
+                        "total_size": total,
+                        "output": output,
+                        "url": url,
+                    }
+                )
             if speed is not None:
                 elapsed_time_expected = 1.0 * pbar.n / speed
                 elapsed_time = time.time() - t_start
@@ -383,6 +394,15 @@ def download(
             mtime = last_modified_time.timestamp()
             os.utime(output, (mtime, mtime))
     finally:
+        try:
+            if f and not f.closed:
+                f.close()
+        except Exception:
+            pass
+        if not quiet and 'pbar' in locals():
+            try:
+                pbar.close()
+            except Exception:
+                pass
         sess.close()
-
     return output
