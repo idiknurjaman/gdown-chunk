@@ -125,6 +125,7 @@ def download(
     user_agent=None,
     log_messages=None,
     progress_callback=None,
+    chunk_size=CHUNK_SIZE,
 ):
     """Download file from URL.
 
@@ -406,3 +407,4 @@ def download(
                 pass
         sess.close()
     return output
+
