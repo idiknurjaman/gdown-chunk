@@ -420,7 +420,10 @@ def download(
                         "output": output,
                         "url": url,
                     })
-                except Exception:
+                except Exception as e:
+                    # Do not swallow critical exceptions for stopping the process
+                    if isinstance(e, (KeyboardInterrupt, InterruptedError)):
+                        raise
                     logger.exception("in progress_callback, continuing anyway")
 
             # … kode delay/speed throttle …
@@ -452,4 +455,3 @@ def download(
                 pass
         sess.close()
     return output
-
