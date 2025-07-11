@@ -360,34 +360,51 @@ def download(
             end="",
         )
 
+    # Put this at module‑top with your imports or above download()
+    class DummyTQDM:
+        def __init__(self, total, initial=0):
+            self.n = initial
+        def update(self, n):
+            self.n += n
+        def close(self): pass
+
+    # … inside your download() …
+
     try:
-        total = res.headers.get("Content-Length")
+        total = res.headers.get("Content‑Length")
         if total is not None:
             total = int(total) + start_size
-        if not quiet:
+
+        # pick real or dummy progress bar
+        if quiet:
+            pbar = DummyTQDM(total=total, initial=start_size)
+        else:
             pbar = tqdm.tqdm(total=total, unit="B", initial=start_size, unit_scale=True)
+
         t_start = time.time()
-        for chunk in res.iter_content(chunk_size=CHUNK_SIZE):
+        for chunk in res.iter_content(chunk_size=chunk_size):
             f.write(chunk)
-            if not quiet:
-                pbar.update(len(chunk))
+
+            # always update our pbar.n
+            pbar.update(len(chunk))
+
+            # user callback sees pbar.n
             if progress_callback:
-                progress_callback(
-                    {
-                        "chunk_size": len(chunk),
-                        "bytes_downloaded": pbar.n,
-                        "total_size": total,
-                        "output": output,
-                        "url": url,
-                    }
-                )
+                progress_callback({
+                    "chunk_size": len(chunk),
+                    "bytes_downloaded": pbar.n,
+                    "total_size": total,
+                    "output": output,
+                    "url": url,
+                })
+
             if speed is not None:
-                elapsed_time_expected = 1.0 * pbar.n / speed
-                elapsed_time = time.time() - t_start
-                if elapsed_time < elapsed_time_expected:
-                    time.sleep(elapsed_time_expected - elapsed_time)
-        if not quiet:
-            pbar.close()
+                elapsed = time.time() - t_start
+                expected = pbar.n / speed
+                if elapsed < expected:
+                    time.sleep(expected - elapsed)
+
+        pbar.close()
         if tmp_file:
             f.close()
             shutil.move(tmp_file, output)
