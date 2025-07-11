@@ -9,6 +9,9 @@ import textwrap
 import time
 import urllib.parse
 from http.cookiejar import MozillaCookieJar
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 import bs4
 import requests
@@ -18,6 +21,14 @@ from ._indent import indent
 from .exceptions import FileURLRetrievalError
 from .parse_url import parse_url
 
+# Put this at module‑top with your imports or above download()
+class DummyTQDM:
+    def __init__(self, total, initial=0):
+        self.n = initial
+    def update(self, n):
+        self.n += n
+    def close(self): pass
+    
 CHUNK_SIZE = 512 * 1024  # 512KB
 home = osp.expanduser("~")
 
@@ -326,7 +337,7 @@ def download(
             resume = False
             # mkstemp is preferred, but does not work on Windows
             # https://github.com/wkentaro/gdown/issues/153
-            tmp_file = tempfile.mktemp(
+            tmp_file = tempfile.mkstemp(
                 suffix=".part",
                 prefix=osp.basename(output),
                 dir=osp.dirname(output),
@@ -337,6 +348,7 @@ def download(
         f = output
 
     if tmp_file is not None and f.tell() != 0:
+        
         start_size = f.tell()
         headers = {"Range": "bytes={}-".format(start_size)}
         res = sess.get(url, headers=headers, stream=True, verify=verify)
@@ -360,20 +372,19 @@ def download(
             end="",
         )
 
-    # Put this at module‑top with your imports or above download()
-    class DummyTQDM:
-        def __init__(self, total, initial=0):
-            self.n = initial
-        def update(self, n):
-            self.n += n
-        def close(self): pass
+
+
+
+
 
     # … inside your download() …
 
     try:
-        total = res.headers.get("Content‑Length")
+        total = res.headers.get("Content-Length")
         if total is not None:
             total = int(total) + start_size
+        else:
+            total = 0
 
         # pick real or dummy progress bar
         if quiet:
@@ -384,19 +395,22 @@ def download(
         t_start = time.time()
         for chunk in res.iter_content(chunk_size=chunk_size):
             f.write(chunk)
-
-            # always update our pbar.n
             pbar.update(len(chunk))
 
-            # user callback sees pbar.n
             if progress_callback:
-                progress_callback({
-                    "chunk_size": len(chunk),
-                    "bytes_downloaded": pbar.n,
-                    "total_size": total,
-                    "output": output,
-                    "url": url,
-                })
+                try:
+                    progress_callback({
+                        "chunk_size": len(chunk),
+                        "bytes_downloaded": pbar.n,
+                        "total_size": total,
+                        "output": output,
+                        "url": url,
+                    })
+                except Exception:
+                    logger.exception("in progress_callback, continuing anyway")
+
+            # … kode delay/speed throttle …
+
 
             if speed is not None:
                 elapsed = time.time() - t_start
