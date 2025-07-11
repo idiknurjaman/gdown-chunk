@@ -23,11 +23,25 @@ from .parse_url import parse_url
 
 # Put this at module‑top with your imports or above download()
 class DummyTQDM:
-    def __init__(self, total, initial=0):
+    def __init__(self, total, initial=0, unit="B", unit_scale=True, progress_callback=None):
         self.n = initial
+        self.total = total
+        self.progress_callback = progress_callback
+
     def update(self, n):
         self.n += n
-    def close(self): pass
+        if self.progress_callback:
+            try:
+                self.progress_callback({
+                    "bytes_downloaded": self.n,
+                    "total_size": self.total
+                })
+            except Exception:
+                logger.exception("DummyTQDM progress_callback failed, ignoring.")
+
+    def close(self):
+        pass
+
     
 CHUNK_SIZE = 512 * 1024  # 512KB
 home = osp.expanduser("~")
